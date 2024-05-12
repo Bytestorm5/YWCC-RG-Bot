@@ -35,14 +35,16 @@ client = YWCCBot()
 async def on_ready():
     print(f'Logged in as {client.user}')
 
-@client.event
-async def on_message(message):
-    if message.author == client.user:
-        return
+# @client.event
+# async def on_message(message):
+#     if message.author == client.user:
+#         return
 
-    if message.content.startswith('$hello'):
-        await message.channel.send('Hello!')
-      
+#     if message.content.startswith('$hello'):
+#         await message.channel.send('Hello!')
+
+    
+
 def format_time_difference(start, end):
     # Calculate the difference between two datetime objects
     delta = end - start
@@ -60,7 +62,7 @@ def format_time_difference(start, end):
     else:
         days = total_seconds // 86400
         return f"{days:+d} d"
-  
+
 @client.tree.command(name='get_history', description='Get chat history from a specific message link onwards')
 @app_commands.describe(message_url='The URL of the message to start history from')
 async def get_chat_history(interaction: discord.Interaction, message_url: str):
@@ -107,9 +109,9 @@ async def get_chat_history(interaction: discord.Interaction, message_url: str):
         idxs = {}
         idx = 1
         last_ts = None
-        def process(message: discord.Message):
-            nonlocal idx, messages, last_ts, idxs
-            idxs[message.id] = idx            
+        def process(message: discord.Message, reverse=False):
+            nonlocal idx, messages, last_ts, idxs, message_count
+            idxs[message.id] = idx if not reverse else message_count - idx + 1
             line = f"{idx}: "
             if last_ts != None:
                 line += format_time_difference(last_ts, message.created_at)
@@ -118,7 +120,7 @@ async def get_chat_history(interaction: discord.Interaction, message_url: str):
             line += f" [{name}]: "
             
             if message.reference != None:
-                line += f"(replyto: @{idxs.get(message.reference.message_id, '?')}) "
+                line += f"(replyto: Msg {idxs.get(message.reference.message_id, '?')}) "
             
             line += process_text(message.content) + "\n"
             
@@ -132,17 +134,35 @@ async def get_chat_history(interaction: discord.Interaction, message_url: str):
                 messages.append(process(message))
         else:
             async for message in channel.history(before=start_message, limit=message_count):    
-                messages.append(process(message))
+                messages.append(process(message, reverse=True))
             messages = list(reversed(messages))
         messages = "\n".join(messages)
-        print("combined all text")
+        
         if messages:            
-            report = llm_parse.process_large_text(messages)
-            print("generated report")
-            await interaction.followup.send(report)  # Displaying first 25 messages as a sample
+            report: str = llm_parse.process_large_text(messages)
+            footnote = f"\n> Generated from messages sent from {start_message.jump_url} to {message.jump_url}"
+            report += footnote
+            
+            if len(report) <= 2000:            
+                await interaction.followup.send(report)
+            else:
+                interacted = False
+                lines = report.splitlines(keepends=True)  # Split the string into lines, preserving line breaks
+                current_chunk = ""
+                for i, line in enumerate(lines):
+                    if len(current_chunk) + len(line) > 2000 or i == len(lines) - 1:
+                        if not interacted:
+                            await interaction.followup.send(current_chunk)
+                            interacted = True
+                        else:
+                            await interaction.channel.send(current_chunk)
+                        current_chunk = line
+                    else:
+                        current_chunk += line
         else:
-            await interaction.followup.send("No messages found after the specified message.")
+            await interaction.followup.send(f"No messages found after the specified message. ({message_url})")
 
     except Exception as e:
-        await interaction.followup.send(f"An error occurred: {str(e)}")
+        #e.with_traceback()
+        await interaction.followup.send(f"An error occurred: {str(e)}\n - Input: {message_url}")
 client.run(TOKEN, log_handler=LOG_HANDLER, log_level=logging.DEBUG)
