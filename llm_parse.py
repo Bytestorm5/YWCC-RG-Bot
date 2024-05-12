@@ -32,7 +32,7 @@ def combine_reports(messages):
         messages=[
             {
                 "role": "system", 
-                "content": "You are a discord bot that summarizes conversations that occur in a student advocacy discord server. These are a series of reports generated on chunks of conversation, in chonological order. Combine them into one report within discord's character limit. " + 
+                "content": "You are a discord bot that summarizes conversations that occur in a student advocacy discord server. These are a series of reports generated on chunks of conversation, in chonological order. Combine them into one comprehensive report." + 
                     "Format the report in discord's formatting scheme- do not encapsulate it in triple ticks as the text will directly be sent as a message. Topics not related to academic issues should be mentioned but do not need much detail- conversely topics related to NJIT/Academics should be summarized in detail."
             },
             {

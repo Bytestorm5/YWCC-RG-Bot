@@ -140,7 +140,7 @@ async def get_chat_history(interaction: discord.Interaction, message_url: str):
         
         if messages:            
             report: str = llm_parse.process_large_text(messages)
-            footnote = f"\n> Generated from messages sent from {start_message.jump_url} to {message.jump_url}"
+            footnote = f"\n> Generated from messages sent from {start_message.jump_url} to {message.jump_url} ({len(messages)} messages)"
             report += footnote
             
             if len(report) <= 2000:            
