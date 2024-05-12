@@ -79,26 +79,36 @@ async def get_chat_history(interaction: discord.Interaction, message_url: str):
         return re.sub(r'<@(\d+)>', replace_ping, str)
     await interaction.response.defer(ephemeral=False)
     try:
-        parts = message_url.split('/')
-        guild_id= int(parts[-3])
-        channel_id = int(parts[-2])
-        message_id = int(parts[-1])
+        try:
+            message_count = int(message_url)
+            channel_id = interaction.channel_id
+            guild_id = interaction.guild_id
+            message_id = None
+        except ValueError as e:           
+            message_count = None
+            parts = message_url.split('/')
+            guild_id= int(parts[-3])
+            channel_id = int(parts[-2])
+            message_id = int(parts[-1])
 
         channel = client.get_channel(channel_id)
         if channel is None or not isinstance(channel, discord.TextChannel):
             await interaction.response.send_message("Channel not found.")
             return
+        if message_id == None:
+            message_id = channel.last_message_id
 
         guild = client.get_guild(guild_id)
         if guild is None or not isinstance(guild, discord.Guild):
             await interaction.response.send_message("Guild not found.")
             return
         start_message = await channel.fetch_message(message_id)
-        messages = ""
+        messages = []
         idxs = {}
         idx = 1
         last_ts = None
-        async for message in channel.history(after=start_message):    
+        def process(message: discord.Message):
+            nonlocal idx, messages, last_ts, idxs
             idxs[message.id] = idx            
             line = f"{idx}: "
             if last_ts != None:
@@ -114,8 +124,17 @@ async def get_chat_history(interaction: discord.Interaction, message_url: str):
             
             last_ts = message.created_at
             idx += 1
-            messages += line
-
+            return line
+        
+        if message_count == None:
+            messages.append(process(start_message))
+            async for message in channel.history(after=start_message):    
+                messages.append(process(message))
+        else:
+            async for message in channel.history(before=start_message, limit=message_count):    
+                messages.append(process(message))
+            messages = list(reversed(messages))
+        messages = "\n".join(messages)
         print("combined all text")
         if messages:            
             report = llm_parse.process_large_text(messages)
