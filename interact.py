@@ -63,6 +63,8 @@ def format_time_difference(start, end):
         days = total_seconds // 86400
         return f"{days:+d} d"
 
+#def preprocess_chats():
+
 @client.tree.command(name='get_history', description='Get chat history from a specific message link onwards')
 @app_commands.describe(message_url='The URL of the message to start history from')
 async def get_chat_history(interaction: discord.Interaction, message_url: str):
@@ -94,7 +96,7 @@ async def get_chat_history(interaction: discord.Interaction, message_url: str):
             message_id = int(parts[-1])
 
         channel = client.get_channel(channel_id)
-        if channel is None or not isinstance(channel, discord.TextChannel):
+        if channel is None or not (isinstance(channel, discord.TextChannel) or isinstance(channel, discord.Thread)):
             await interaction.response.send_message("Channel not found.")
             return
         if message_id == None:
@@ -140,7 +142,7 @@ async def get_chat_history(interaction: discord.Interaction, message_url: str):
         
         if messages:            
             report: str = llm_parse.process_large_text(messages)
-            footnote = f"\n> Generated from messages sent from {start_message.jump_url} to {message.jump_url} ({len(messages)} messages)"
+            footnote = f"\n> Generated from messages sent from {start_message.jump_url} to {message.jump_url} ({idx} messages; {len(messages)} chars)"
             report += footnote
             
             if len(report) <= 2000:            
@@ -149,16 +151,22 @@ async def get_chat_history(interaction: discord.Interaction, message_url: str):
                 interacted = False
                 lines = report.splitlines(keepends=True)  # Split the string into lines, preserving line breaks
                 current_chunk = ""
-                for i, line in enumerate(lines):
-                    if len(current_chunk) + len(line) > 2000 or i == len(lines) - 1:
-                        if not interacted:
-                            await interaction.followup.send(current_chunk)
-                            interacted = True
-                        else:
-                            await interaction.channel.send(current_chunk)
+                
+                async def send(text):
+                    nonlocal interacted, interaction
+                    if not interacted:
+                        await interaction.followup.send(text)
+                        interacted = True
+                    else:
+                        await interaction.channel.send(text)
+                        
+                for line in lines:
+                    if len(current_chunk) + len(line) > 2000:
+                        await send(current_chunk)
                         current_chunk = line
                     else:
                         current_chunk += line
+                await send(current_chunk)
         else:
             await interaction.followup.send(f"No messages found after the specified message. ({message_url})")
 

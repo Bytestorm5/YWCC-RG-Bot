@@ -5,7 +5,7 @@ import tiktoken
 
 load_dotenv()
 TOKEN = os.environ.get('OPENAI_TOKEN')
-MODEL = "gpt-4-turbo"
+MODEL = "gpt-4o"
 client = OpenAI(api_key=TOKEN)
 
 def process_transcript(messages):
