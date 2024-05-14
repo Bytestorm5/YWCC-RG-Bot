@@ -9,7 +9,7 @@ import llm_parse
 LOG_HANDLER = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 
 load_dotenv()
-TOKEN = os.environ.get('DISCORd_TOKEN')
+TOKEN = os.environ.get('DISCORD_TOKEN')
 
 intents = discord.Intents.default()
 intents.message_content = True
