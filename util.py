@@ -124,6 +124,12 @@ class Util():
 
     async def get_user(self, row):
         """get a users id from the hash"""
+        try:
+            with open("db.txt", "r") as file:
+                pass
+        except FileNotFoundError:
+            with open("db.txt", "w") as file:
+                pass
         with open("db.txt", "r") as file:
             lines = file.readlines()
             return lines[row].split(" ")[1] or None
