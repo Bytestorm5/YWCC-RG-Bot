@@ -112,6 +112,7 @@ async def on_message(message):
     channel_id = os.environ.get('MODAMAIL_ID')
     util = Util(client, None)
     message = util.convert_mentions_to_string(message)
+
     try:
         if message.guild is None and message.author.bot == False:
             user_id = await util.get_annon_id(str(hash(message.author)), str(message.author.id))
@@ -122,47 +123,26 @@ async def on_message(message):
             # get the names of the threads
             thread_names = [thread.name for thread in threads]
             # check if the user has a thread
-            if len(thread_names) > 0 and f"Annonymous User {user_id_str}" in thread_names:
-                thread = [thread for thread in threads if thread.name ==
-                          f"Annonymous User {user_id_str}"][0]
-                if (thread.archived == True or thread.locked == True):
-                    new_message = await channel.send(
-                        f"Annonymous User {user_id_str}")
-                    thread = await channel.create_thread(name=f"Annonymous User {user_id_str}", message=new_message)
-                await thread.send(f"Annonymous User: {message.content}")
-                # Check if there are any attachments in the message
-                if message.attachments:
-                    for attachment in message.attachments:
-                        # Download the attachment and send it
-                        await attachment.save(attachment.filename)
-                        await thread.send(file=discord.File(attachment.filename))
-                        os.remove(attachment.filename)
-                await message.add_reaction("📨")
+            thread = [thread for thread in threads if thread.name ==
+                      f"Annonymous User {user_id_str}"]
+            if len(thread) == 1:
+                thread = thread[0]
             else:
-                new_message = await channel.send(
-                    f"Annonymous User {user_id_str}")
-                thread = await channel.create_thread(name=f"Annonymous User {user_id_str}", message=new_message)
-                await thread.send(f"Annonymous User: {message.content}")
-                # Check if there are any attachments in the message
-                if message.attachments:
-                    for attachment in message.attachments:
-                        # Download the attachment and send it
-                        await attachment.save(attachment.filename)
-                        await thread.send(file=discord.File(attachment.filename))
-                        os.remove(attachment.filename)
-                await message.add_reaction("📨")
+                thread = None
+            if thread not in threads or thread.archived == True or thread.locked == True:
+                # if the thread is archived, locked or not in the list of threads, create a new thread
+                thread = await util.create_thread(channel, user_id_str)
+            await thread.send(f"Annonymous User: {message.content}")
+            await util.send_attachment(message, thread)
+            await message.add_reaction("📨")
         elif int(message.channel.parent_id) == int(channel_id) and message.author.bot == False:
             thread = message.channel
             user_id = int(thread.name.split(" ")[-1])
             discord_user_id = await util.get_user(user_id)
             user = client.get_user(int(discord_user_id))
             sender_name = message.author.display_name
-            if message.attachments:
-                for attachment in message.attachments:
-                    await attachment.save(attachment.filename)
-                    await user.send(f"{sender_name}: {message.content}", file=discord.File(attachment.filename))
-                    os.remove(attachment.filename)
             await user.send(f"{sender_name}: {message.content}")
+            await util.send_attachment(message, user)
             # react to the message
             await message.add_reaction("📨")
     except Exception as e:

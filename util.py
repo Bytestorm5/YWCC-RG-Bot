@@ -1,5 +1,6 @@
 import discord
 import re
+import os
 
 
 class Util():
@@ -150,3 +151,16 @@ class Util():
         # this will replace any other mentions with someone
         message.content = re.sub(ping_regex, "unknown user", message.content)
         return message
+
+    async def create_thread(self, channel, user_id_str):
+        new_message = await channel.send(
+            f"Annonymous User {user_id_str}")
+        thread = await channel.create_thread(name=f"Annonymous User {user_id_str}", message=new_message)
+        return thread
+
+    async def send_attachment(self, message, destination):
+        if message.attachments:
+            for attachment in message.attachments:
+                await attachment.save(attachment.filename)
+                await destination.send(file=discord.File(attachment.filename))
+                os.remove(attachment.filename)
