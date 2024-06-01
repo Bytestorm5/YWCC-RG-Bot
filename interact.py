@@ -269,5 +269,34 @@ async def send_modmail(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
 
+# help command
+
+
+@client.tree.command(name='help', description='Get help with the bot')
+async def help(interaction: discord.Interaction):
+    """Get help with the bot."""
+    await interaction.response.defer(ephemeral=True)
+    try:
+        help_message = """
+        **Commands:**
+- `/get_history <message_url>`: Get chat history from a specific message link onwards.
+    - get the message link by right clicking on the message and selecting "Copy Message Link"
+- `/get_last_x_messages <channel> <count>`: Get the last x messages from a channel.
+    - `<channel>`: Mention the channel you want to get messages from.
+    - `<count>`: The number of messages to get.
+- `/new_conversation`: Create a new thread on the modamail channel unaffected with past messages.
+    - This command can only be used in DMs.
+    - It creates a new thread in the modmail channel.
+    - messages sent to the dms will be sent to the new thread.
+- `/list_threads`: List all the threads in the modamail channel that you have made.
+    - This command can only be used in DMs.
+    - It lists all the threads you have created.
+- `/send_modmail`: Send a message to a specific modmail thread.
+    - This command can only be used in DMs.
+    - It sends a message to a specific modmail thread, even if the thread is not the most recent.
+        """
+        await interaction.followup.send(help_message)
+    except Exception as e:
+        await interaction.followup.send(f"An error occurred: {str(e)}")
 
 client.run(TOKEN, log_handler=LOG_HANDLER, log_level=logging.DEBUG)
