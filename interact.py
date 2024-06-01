@@ -97,7 +97,7 @@ async def on_message(message: discord.Message):
 async def _reply_modmail(id: str, sender_name: str, message:str):
     reverse_mapping = {v:k for k,v in modmail_info['users'].items()}
     target = client.get_user(int(reverse_mapping[id]))
-    content = f"> Message from {sender_name} at YWCC Reform:\n{message}"
+    content = f"> Message from **{sender_name}** at YWCC Reform:\n{message}"
     if len(content) <= 2000:
         await target.send(content)
     else:
