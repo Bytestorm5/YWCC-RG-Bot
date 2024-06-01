@@ -100,7 +100,7 @@ class Util():
                     current_chunk += line
             await send(current_chunk)
 
-    async def get_annon_id(self, user_hash, user_id):
+    async def get_annon_id(self, user_hash, user_id, new_conversion=False):
         """add a users hash to the file"""
         # if the file does not exist, create it
         try:
@@ -112,14 +112,15 @@ class Util():
 
         with open("db.txt", "r") as file:
             lines = file.readlines()
+            lines.reverse()
             # check if the user is already in the file
             for line in lines:
-                if user_hash in line:
-                    # return the line number
-                    return lines.index(line)
+                if not new_conversion and user_hash in line:
+                    # return the line number, if its in the file multiple times, return the last one
+                    return len(lines) - lines.index(line) - 1
             # add the user to the file
             lines.append(user_hash + " " + user_id + "\n")
-        with open("db.txt", "w") as file:
+        with open("db.txt", "a") as file:
             file.writelines(lines)
         return len(lines) - 1
 
@@ -134,6 +135,24 @@ class Util():
         with open("db.txt", "r") as file:
             lines = file.readlines()
             return lines[row].split(" ")[1] or None
+
+    async def get_rows_with_id(self, user_id):
+        """get all the rows with a user id"""
+        try:
+            with open("db.txt", "r") as file:
+                pass
+        except FileNotFoundError:
+            with open("db.txt", "w") as file:
+                pass
+        with open("db.txt", "r") as file:
+            lines = file.readlines()
+            rows = []
+            index = 0
+            for line in lines:
+                if user_id in line.split(" ")[1].strip():
+                    rows.append(str(index))
+                index += 1
+            return rows
 
     def convert_mentions_to_string(self, message: discord.Message):
         """Convert mentions in a message to string representations."""
