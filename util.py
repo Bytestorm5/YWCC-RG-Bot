@@ -180,6 +180,5 @@ class Util():
     async def send_attachment(self, message, destination):
         if message.attachments:
             for attachment in message.attachments:
-                await attachment.save(attachment.filename)
-                await destination.send(file=discord.File(attachment.filename))
-                os.remove(attachment.filename)
+                file = await attachment.to_file()
+                await destination.send(file=file)
