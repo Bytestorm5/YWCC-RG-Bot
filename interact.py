@@ -115,7 +115,7 @@ async def on_message(message):
 
     try:
         if message.guild is None and message.author.bot == False:
-            user_id = await util.get_annon_id(str(hash(message.author)), str(message.author.id))
+            user_id = await util.get_annon_id(str(hash(message.author.id)), str(message.author.id))
             user_id_str = str(user_id)
             channel = client.get_channel(int(channel_id))
             # get all the threads in the channel
@@ -162,7 +162,7 @@ async def new_thread(interaction: discord.Interaction):
             return
         channel_id = os.environ.get('MODAMAIL_ID')
         util = Util(client, None)
-        user_id = await util.get_annon_id(str(hash(interaction.user)), str(interaction.user.id), new_conversion=True)
+        user_id = await util.get_annon_id(str(hash(interaction.user.id)), str(interaction.user.id), new_conversion=True)
         user_id_str = str(user_id)
         channel = client.get_channel(int(channel_id))
         threads = channel.threads
@@ -202,77 +202,49 @@ async def list_threads(interaction: discord.Interaction):
         await interaction.followup.send(f"An error occurred: {str(e)}")
 
 
-@client.tree.command(name='send_modmail', description='Send a message to a specific modmail thread')
-async def send_modmail(interaction: discord.Interaction):
-    """Send a message to a specific modmail thread."""
+@client.tree.command(name='switch_active_thread', description='Switch to a different modmail thread')
+@app_commands.describe()
+async def switch_active_thread(interaction: discord.Interaction):
+    """Give the user a selection of threads to switch to."""
     await interaction.response.defer(ephemeral=True)
     try:
         if interaction.guild is not None:
-            # make it only visible to the user
-            await interaction.followup.send("This command can only be used in DMs, it sends a message to a specific modmail thread.")
+            await interaction.followup.send("This command can only be used in DMs, it lists all the threads you have created.")
             return
-        channel_id = os.environ.get('MODAMAIL_ID')
-        channel = client.get_channel(int(channel_id))
-        if not isinstance(channel, discord.TextChannel):
-            await interaction.followup.send("Modmail channel not found.")
-            return
-
-        async def get_thread_names(user_id):
-            thread_data = [{"name": f"Annonymous User {thread_name}", "id": thread_name} for thread_name in await Util(client, None).get_rows_with_id(str(hash(user_id)))]
-            return thread_data
-        threads = await get_thread_names(interaction.user.id)
-        if not threads:
-            await interaction.followup.send("No active threads found.")
-            return
-
-        options = [discord.SelectOption(
-            label=thread["name"], value=thread["id"]) for thread in threads]
-        if not options:
-            await interaction.followup.send("No available threads.")
-            return
-
-        class ThreadSelect(discord.ui.Select):
-            def __init__(self, options):
-                super().__init__(placeholder='Choose a thread...',
-                                 min_values=1, max_values=1, options=options)
-
-            async def callback(self, interaction: discord.Interaction):
-                selected_thread_id = self.values[0]
-                selected_thread = discord.utils.get(
-                    channel.threads, name=f"Annonymous User {selected_thread_id}")
-                if not selected_thread:
-                    await interaction.response.send_message("Selected thread not found.", ephemeral=True)
-                    return
-
-                class ModmailModal(discord.ui.Modal, title="Send Modmail"):
-                    message = discord.ui.TextInput(
-                        label="Message", style=discord.TextStyle.paragraph)
-
-                    async def on_submit(self, modal_interaction: discord.Interaction):
-                        try:
-                            await selected_thread.send(f"Annonymous User: {self.message.value}")
-                            await Util(client, None).send_attachment(interaction.message, selected_thread)
-                            new_message = await interaction.followup.send(f"Message sent to thread \"{selected_thread.name}\".", ephemeral=False)
-                            await new_message.add_reaction("📨")
-                            await modal_interaction.response.edit_message(content="Message sent.", view=None)
-                        except Exception as e:
-                            print(e)
-                            # await interaction.response.send_message(f"An error occurred: {str(e)}", ephemeral=True)
-
-                await interaction.response.send_modal(ModmailModal())
-
-        select = ThreadSelect(options)
-        view = discord.ui.View()
-        view.add_item(select)
-        await interaction.followup.send("Select a thread to send a message to:", view=view, ephemeral=True)
-
+        util = Util(client, None)
+        thread_names = await util.get_rows_with_id(str(hash(interaction.user.id)))
+        if len(thread_names) > 0:
+            threads = [await util.get_thread_by_index(int(thread_name)) for thread_name in thread_names]
+            select = ThreadSelect(threads, util)
+            view = discord.ui.View()
+            view.add_item(select)
+            print("sending")
+            await interaction.followup.send("Select a thread to switch to:", view=view)
+        else:
+            await interaction.followup.send(f"No threads found.")
     except Exception as e:
-        await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
+        await interaction.followup.send(f"An error occurred: {str(e)}")
+
+
+class ThreadSelect(discord.ui.Select):
+    def __init__(self, threads, util):
+        self.threads = threads
+        self.util = util
+        super().__init__(placeholder="Select a thread", options=[discord.SelectOption(
+            label=f"Annonymous User {thread}", value=f"{thread}") for thread in threads])
+
+    async def callback(self, interaction: discord.Interaction):
+        thread_num = interaction.data["values"][0]
+        thread_name = f"Annonymous User {thread_num}"
+        hash_val = str(hash(interaction.user.id))
+        print(thread_num, hash_val)
+        await self.util.set_active(int(thread_num), hash_val)
+        await interaction.response.send_message(f"# Switched to thread: {thread_name}")
 
 # help command
 
 
-@client.tree.command(name='help', description='Get help with the bot')
+@ client.tree.command(name='help', description='Get help with the bot')
 async def help(interaction: discord.Interaction):
     """Get help with the bot."""
     await interaction.response.defer(ephemeral=True)
@@ -291,9 +263,10 @@ async def help(interaction: discord.Interaction):
 - `/list_threads`: List all the threads in the modamail channel that you have made.
     - This command can only be used in DMs.
     - It lists all the threads you have created.
-- `/send_modmail`: Send a message to a specific modmail thread.
+- `/switch_active_thread`: Switch to a different modmail thread.
     - This command can only be used in DMs.
-    - It sends a message to a specific modmail thread, even if the thread is not the most recent.
+    - It lists all the threads you have created.
+    - The user can select a thread to switch to.
         """
         await interaction.followup.send(help_message)
     except Exception as e:
