@@ -3,12 +3,9 @@ from dotenv import load_dotenv
 import os
 import logging
 from discord import app_commands
-import re
 import llm_parse
-from json_interact import JsonInteractor
-import random
-import string
-
+from util import Util
+from typing import Literal
 LOG_HANDLER = logging.FileHandler(
     filename='discord.log', encoding='utf-8', mode='w')
 
@@ -35,9 +32,10 @@ class YWCCBot(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        server_id = discord.Object(id=1229521003001024562)
-        self.tree.copy_global_to(guild=server_id)
-        await self.tree.sync(guild=server_id)
+        # server_id = discord.Object(id=os.environ.get('DISCORD_SERVER_ID'))
+        # self.tree.copy_global_to(guild=server_id) # comment this so that the commands are global and can be used in dms
+        await self.tree.sync()
+
 
 
 client = YWCCBot()
@@ -49,149 +47,23 @@ async def on_ready():
     modmail_channel = client.get_channel(modmail_info['channel'])
     print(f'Logged in as {client.user}')
 
-@client.event
-async def on_message(message: discord.Message):
-    if message.author == client.user:
-        return
-
-    if isinstance(message.channel, discord.DMChannel):
-        author_id = modmail_info['users'].get(str(message.author.id))
-        if author_id == None:
-            # Astronomical odds of a collision realistically but I aint taking chances
-            while author_id == None or author_id in modmail_info['users']:
-                author_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-            
-            modmail_info['users'][str(message.author.id)] = author_id
-            modmail_info.update_file()
-        
-        if '\n' in message.content:
-            content = f"**[{author_id}]:**\n>>> {message.content}"
-        else:
-            content = f"**[{author_id}]:** {message.content}"
-        
-        def replace_ping(match):
-            try:
-                indices = match.regs[1]
-                id = int(match.string[indices[0]:indices[1]])
-                name = client.get_user(id).display_name
-                return '\@ ' + name
-            except:
-                return "[unresolved ping]"
-        content = re.sub(r'<@(\d+)>', replace_ping, content)
-        content = content.replace("@everyone", "`[mass ping]`")
-        content = content.replace("@here", "`[mass ping]`")
-        if len(content) <= 2000:
-            await modmail_channel.send(content)
-        else:
-            lines = content.splitlines(keepends=True)
-            current_chunk = ""
-            for line in lines:
-                if len(current_chunk) + len(line) > 2000:
-                    await modmail_channel.send(current_chunk)
-                    current_chunk = line
-                else:
-                    current_chunk += line
-            
-        await message.add_reaction("📨")
-
-async def _reply_modmail(id: str, sender_name: str, message:str):
-    reverse_mapping = {v:k for k,v in modmail_info['users'].items()}
-    target = client.get_user(int(reverse_mapping[id]))
-    content = f"> Message from **{sender_name}** at YWCC Reform:\n{message}"
-    if len(content) <= 2000:
-        await target.send(content)
-    else:
-        lines = content.splitlines(keepends=True)
-        current_chunk = ""
-        for line in lines:
-            if len(current_chunk) + len(line) > 2000:
-                await target.send(current_chunk)
-                current_chunk = line
-            else:
-                current_chunk += line
-    
-@client.tree.command(name='reply', description='Respond to an anonymous modmail message')
-@app_commands.describe()
-async def reply_modmail(interaction: discord.Interaction, id: str, message: str):
-    await interaction.response.defer(ephemeral=False)
-    await _reply_modmail(id, interaction.user.display_name, message)
-    await interaction.followup.send("Sent!")
-
-def format_time_difference(start, end):
-    # Calculate the difference between two datetime objects
-    delta = end - start
-    total_seconds = int(delta.total_seconds())
-
-    # Determine the time units to use for the difference
-    if abs(total_seconds) < 60:
-        return f"{total_seconds:+d} sec"
-    elif abs(total_seconds) < 3600:
-        minutes = total_seconds // 60
-        return f"{minutes:+d} min"
-    elif abs(total_seconds) < 86400:
-        hours = total_seconds // 3600
-        return f"{hours:+d} h"
-    else:
-        days = total_seconds // 86400
-        return f"{days:+d} d"
-
-# def preprocess_chats():
-
-async def batch_reply(interaction: discord.Interaction, report: str):
-    if len(report) <= 2000:
-        await interaction.followup.send(report)
-    else:
-        interacted = False
-        # Split the string into lines, preserving line breaks
-        lines = report.splitlines(keepends=True)
-        current_chunk = ""
-
-        async def send(text):
-            nonlocal interacted, interaction
-            if not interacted:
-                await interaction.followup.send(text)
-                interacted = True
-            else:
-                await interaction.channel.send(text)
-
-        for line in lines:
-            if len(current_chunk) + len(line) > 2000:
-                await send(current_chunk)
-                current_chunk = line
-            else:
-                current_chunk += line
-        await send(current_chunk)
 
 @client.tree.command(name='get_history', description='Get chat history from a specific message link onwards')
 @app_commands.describe(message_url='The URL of the message to start history from')
 async def get_chat_history(interaction: discord.Interaction, message_url: str):
-    user_dict = {}
-
-    def get_name(id):
-        if id in user_dict:
-            return user_dict[id]
-        name = guild.get_member(id).nick
-        name = name if name != None else client.get_user(id).display_name + "*"
-        user_dict[id] = name
-        return name
-
-    def process_text(str):
-        def replace_ping(match):
-            indices = match.regs[1]
-            return '@' + get_name(int(match.string[indices[0]:indices[1]]))
-        return re.sub(r'<@(\d+)>', replace_ping, str)
+    """Get chat history from a specific message link onwards."""
     await interaction.response.defer(ephemeral=False)
     try:
         try:
-            message_count = None
             parts = message_url.split('/')
             guild_id = int(parts[-3])
             channel_id = int(parts[-2])
             message_id = int(parts[-1])
+            guild = client.get_guild(guild_id)
+            util = Util(client, guild)
         except ValueError as e:
             interaction.followup.send("Failed: Invalid URL")
             return
-
         channel = client.get_channel(channel_id)
         if channel is None or not (isinstance(channel, discord.TextChannel) or isinstance(channel, discord.Thread)):
             await interaction.followup.send("Channel not found.")
@@ -199,115 +71,241 @@ async def get_chat_history(interaction: discord.Interaction, message_url: str):
         if message_id == None:
             message_id = channel.last_message_id
 
-        guild = client.get_guild(guild_id)
         if guild is None or not isinstance(guild, discord.Guild):
             await interaction.followup.send("Guild not found.")
             return
         start_message = await channel.fetch_message(message_id)
         messages = []
-        idxs = {}
-        idx = 1
-        last_ts = None
-
-        def process(message: discord.Message):
-            nonlocal idx, messages, last_ts, idxs, message_count
-            idxs[message.id] = idx
-            line = f"{idx}: "
-            if last_ts != None:
-                line += format_time_difference(last_ts, message.created_at)
-
-            name = get_name(message.author.id)
-            line += f" [{name}]: "
-
-            if message.reference != None:
-                line += f"(replyto: Msg {idxs.get(message.reference.message_id, '?')}) "
-
-            line += process_text(message.content) + "\n"
-
-            last_ts = message.created_at
-            idx += 1
-            return line
-
-        
-        messages.append(process(start_message))
+        messages.append(util.process(start_message))
         async for message in channel.history(after=start_message):
-            messages.append(process(message))
+            messages.append(util.process(message))
         messages = "\n".join(messages)
 
         if messages:
             report: str = llm_parse.process_large_text(messages)
-            footnote = f"\n> Generated from messages sent from {start_message.jump_url} to {message.jump_url} ({idx} messages; {len(messages)} chars)"
+            footnote = f"\n> Generated from messages sent from {start_message.jump_url} to {message.jump_url} ({util.get_idx()} messages; {len(messages)} chars)"
             report += footnote
-
-            await batch_reply(interaction, report)
+            await util.batch_reply(interaction, report)
         else:
             await interaction.followup.send(f"No messages found after the specified message. ({message_url})")
-
     except Exception as e:
-        # e.with_traceback()
         await interaction.followup.send(f"An error occurred: {str(e)}\n - Input: {message_url}")
+
 
 @client.tree.command(name='get_last_x_messages', description='Get the last x messages from a channel')
 @app_commands.describe(channel='The channel to get messages from', count='The number of messages to get')
 async def get_last_x_messages(interaction: discord.Interaction, channel: discord.TextChannel, count: int):
-    user_dict = {}
-
-    def get_name(id):
-        if id in user_dict:
-            return user_dict[id]
-        name = guild.get_member(id).nick
-        name = name if name != None else client.get_user(id).display_name + "*"
-        user_dict[id] = name
-        return name
-
-    def process_text(str):
-        def replace_ping(match):
-            indices = match.regs[1]
-            return '@' + get_name(int(match.string[indices[0]:indices[1]]))
-        return re.sub(r'<@(\d+)>', replace_ping, str)
+    """Get the last x messages from a channel."""
     await interaction.response.defer(ephemeral=False)
     try:
         guild = channel.guild
+        util = Util(client, guild)
         messages = []
-        idxs = {}
-        idx = 1
-        last_ts = None
-
-        def process(message: discord.Message):
-            nonlocal idx, messages, last_ts, idxs, count
-            idxs[message.id] = count - idx + 1
-            line = f"{idx}: "
-            if last_ts != None:
-                line += format_time_difference(last_ts, message.created_at)
-
-            name = get_name(message.author.id)
-            line += f" [{name}]: "
-
-            if message.reference != None:
-                line += f"(replyto: Msg {idxs.get(message.reference.message_id, '?')}) "
-
-            line += process_text(message.content) + "\n"
-
-            last_ts = message.created_at
-            idx += 1
-            return line
-
         async for message in channel.history(limit=count):
-            messages.append(process(message))
+            messages.append(util.process(message))
         messages = "\n".join(messages)
-
         if messages:
             report: str = llm_parse.process_large_text(messages)
-            footnote = f"\n> Generated from the last {count} messages in {channel.mention} ({idx} messages; {len(messages)} chars)"
+            footnote = f"\n> Generated from the last {count} messages in {channel.mention} ({util.get_idx()} messages; {len(messages)} chars)"
             report += footnote
-
-            await batch_reply(interaction, report)
+            await util.batch_reply(interaction, report)
         else:
             await interaction.followup.send(f"No messages found in {channel.mention}")
-
     except Exception as e:
         # e.with_traceback()
         await interaction.followup.send(f"An error occurred: {str(e)}")
 
+
+@client.event
+async def on_message(message):
+    channel_id = os.environ.get('MODAMAIL_ID')
+    util = Util(client, None)
+    message = util.convert_mentions_to_string(message)
+
+    try:
+        if message.guild is None and message.author.bot == False:
+            user_id = await util.get_annon_id(str(hash(message.author)), str(message.author.id))
+            user_id_str = str(user_id)
+            channel = client.get_channel(int(channel_id))
+            # get all the threads in the channel
+            threads = channel.threads
+            # check if the user has a thread
+            thread = [thread for thread in threads if thread.name ==
+                      f"Annonymous User {user_id_str}"]
+            if len(thread) == 1:
+                thread = thread[0]
+            else:
+                thread = None
+            if thread not in threads or thread.archived == True or thread.locked == True:
+                # if the thread is archived, locked or not in the list of threads, create a new thread
+                thread = await util.create_thread(channel, user_id_str)
+            await thread.send(f"Annonymous User: {message.content}")
+            await util.send_attachment(message, thread)
+            await message.add_reaction("📨")
+        elif int(message.channel.parent_id) == int(channel_id) and message.author.bot == False:
+            thread = message.channel
+            user_id = int(thread.name.split(" ")[-1])
+            discord_user_id = await util.get_user(user_id)
+            user = client.get_user(int(discord_user_id))
+            sender_name = message.author.display_name
+            await user.send(f"""**{sender_name}**   💬   in the {thread.name} thread
+>>> {message.content}""")
+            await util.send_attachment(message, user)
+            # react to the message
+            await message.add_reaction("📨")
+    except Exception as e:
+        logging.error(f"Error: {str(e)}")
+        if message.author.bot == False:
+            await message.channel.send(f"An error occurred: {str(e)}")
+
+
+# make a command that can be used in dms to make a new thread
+@client.tree.command(name='new_conversation', description='Create a new thread on the modamail channel unaffected with past messages')
+@app_commands.describe()
+async def new_thread(interaction: discord.Interaction):
+    """Create a new thread."""
+    await interaction.response.defer(ephemeral=True)
+    try:
+        if interaction.guild is not None:
+            await interaction.followup.send("This command can only be used in DMs, it creates a new thread in the modmail channel.")
+            return
+        channel_id = os.environ.get('MODAMAIL_ID')
+        util = Util(client, None)
+        user_id = await util.get_annon_id(str(hash(interaction.user)), str(interaction.user.id), new_conversion=True)
+        user_id_str = str(user_id)
+        channel = client.get_channel(int(channel_id))
+        threads = channel.threads
+        thread = [thread for thread in threads if thread.name ==
+                  f"Annonymous User {user_id_str}"]
+        if len(thread) == 1:
+            thread = thread[0]
+        else:
+            thread = None
+        if thread not in threads or thread.archived == True or thread.locked == True:
+            thread = await util.create_thread(channel, user_id_str)
+        await interaction.followup.send(f"Thread created, new messages will be sent to the new thread called \"{thread.name}\"")
+    except Exception as e:
+        await interaction.followup.send(f"An error occurred: {str(e)}")
+# list the threads command
+
+
+@client.tree.command(name='list_threads', description='List all the threads in the modamail channel that you have made')
+async def list_threads(interaction: discord.Interaction):
+    """List all the threads in the modamail channel."""
+    await interaction.response.defer(ephemeral=True)
+    try:
+        if interaction.guild is not None:
+            # await interaction.followup.send("This command can only be used in DMs, it lists all the threads you have created.", ephemeral=True)
+            # make this only visible to the user, as a reply
+            await interaction.followup.send("This command can only be used in DMs, it lists all the threads you have created.")
+            return
+        util = Util(client, None)
+        thread_names = await util.get_rows_with_id(str(hash(interaction.user.id)))
+        thread_names = [
+            f"Annonymous User {thread_name}" for thread_name in thread_names]
+        if len(thread_names) > 0:
+            await interaction.followup.send(f"Threads: {', '.join(thread_names)}")
+        else:
+            await interaction.followup.send(f"No threads found.")
+    except Exception as e:
+        await interaction.followup.send(f"An error occurred: {str(e)}")
+
+
+@client.tree.command(name='send_modmail', description='Send a message to a specific modmail thread')
+async def send_modmail(interaction: discord.Interaction):
+    """Send a message to a specific modmail thread."""
+    await interaction.response.defer(ephemeral=True)
+    try:
+        if interaction.guild is not None:
+            # make it only visible to the user
+            await interaction.followup.send("This command can only be used in DMs, it sends a message to a specific modmail thread.")
+            return
+        channel_id = os.environ.get('MODAMAIL_ID')
+        channel = client.get_channel(int(channel_id))
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.followup.send("Modmail channel not found.")
+            return
+
+        async def get_thread_names(user_id):
+            thread_data = [{"name": f"Annonymous User {thread_name}", "id": thread_name} for thread_name in await Util(client, None).get_rows_with_id(str(hash(user_id)))]
+            return thread_data
+        threads = await get_thread_names(interaction.user.id)
+        if not threads:
+            await interaction.followup.send("No active threads found.")
+            return
+
+        options = [discord.SelectOption(
+            label=thread["name"], value=thread["id"]) for thread in threads]
+        if not options:
+            await interaction.followup.send("No available threads.")
+            return
+
+        class ThreadSelect(discord.ui.Select):
+            def __init__(self, options):
+                super().__init__(placeholder='Choose a thread...',
+                                 min_values=1, max_values=1, options=options)
+
+            async def callback(self, interaction: discord.Interaction):
+                selected_thread_id = self.values[0]
+                selected_thread = discord.utils.get(
+                    channel.threads, name=f"Annonymous User {selected_thread_id}")
+                if not selected_thread:
+                    await interaction.response.send_message("Selected thread not found.", ephemeral=True)
+                    return
+
+                class ModmailModal(discord.ui.Modal, title="Send Modmail"):
+                    message = discord.ui.TextInput(
+                        label="Message", style=discord.TextStyle.paragraph)
+
+                    async def on_submit(self, modal_interaction: discord.Interaction):
+                        try:
+                            await selected_thread.send(f"Annonymous User: {self.message.value}")
+                            await Util(client, None).send_attachment(interaction.message, selected_thread)
+                            new_message = await interaction.followup.send(f"Message sent to thread \"{selected_thread.name}\".", ephemeral=False)
+                            await new_message.add_reaction("📨")
+                            await modal_interaction.response.edit_message(content="Message sent.", view=None)
+                        except Exception as e:
+                            print(e)
+                            # await interaction.response.send_message(f"An error occurred: {str(e)}", ephemeral=True)
+
+                await interaction.response.send_modal(ModmailModal())
+
+        select = ThreadSelect(options)
+        view = discord.ui.View()
+        view.add_item(select)
+        await interaction.followup.send("Select a thread to send a message to:", view=view, ephemeral=True)
+
+    except Exception as e:
+        await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
+
+# help command
+
+
+@client.tree.command(name='help', description='Get help with the bot')
+async def help(interaction: discord.Interaction):
+    """Get help with the bot."""
+    await interaction.response.defer(ephemeral=True)
+    try:
+        help_message = """
+        **Commands:**
+- `/get_history <message_url>`: Get chat history from a specific message link onwards.
+    - get the message link by right clicking on the message and selecting "Copy Message Link"
+- `/get_last_x_messages <channel> <count>`: Get the last x messages from a channel.
+    - `<channel>`: Mention the channel you want to get messages from.
+    - `<count>`: The number of messages to get.
+- `/new_conversation`: Create a new thread on the modamail channel unaffected with past messages.
+    - This command can only be used in DMs.
+    - It creates a new thread in the modmail channel.
+    - messages sent to the dms will be sent to the new thread.
+- `/list_threads`: List all the threads in the modamail channel that you have made.
+    - This command can only be used in DMs.
+    - It lists all the threads you have created.
+- `/send_modmail`: Send a message to a specific modmail thread.
+    - This command can only be used in DMs.
+    - It sends a message to a specific modmail thread, even if the thread is not the most recent.
+        """
+        await interaction.followup.send(help_message)
+    except Exception as e:
+        await interaction.followup.send(f"An error occurred: {str(e)}")
 
 client.run(TOKEN, log_handler=LOG_HANDLER, log_level=logging.DEBUG)
