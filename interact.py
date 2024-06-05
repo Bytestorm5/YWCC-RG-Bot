@@ -15,12 +15,12 @@ TOKEN = os.environ.get('DISCORD_TOKEN')
 intents = discord.Intents.default()
 intents.message_content = True
 
-modmail_path = 'modmail.json'
-modmail_info = JsonInteractor(modmail_path)
-if not os.path.exists(modmail_path):
-    modmail_info['channel'] = int(os.environ.get("MOD_CHANNEL"))
-    modmail_info['users'] = {}
-modmail_channel: discord.TextChannel = None
+# modmail_path = 'modmail.json'
+# modmail_info = JsonInteractor(modmail_path)
+# if not os.path.exists(modmail_path):
+#     modmail_info['channel'] = int(os.environ.get("MOD_CHANNEL"))
+#     modmail_info['users'] = {}
+# modmail_channel: discord.TextChannel = None
 
 class YWCCBot(discord.Client):
     def __init__(self):
@@ -43,8 +43,8 @@ client = YWCCBot()
 
 @client.event
 async def on_ready():
-    global modmail_channel
-    modmail_channel = client.get_channel(modmail_info['channel'])
+    # global modmail_channel
+    # modmail_channel = client.get_channel(modmail_info['channel'])
     print(f'Logged in as {client.user}')
 
 
@@ -118,7 +118,7 @@ async def get_last_x_messages(interaction: discord.Interaction, channel: discord
 
 @client.event
 async def on_message(message):
-    channel_id = os.environ.get('MODAMAIL_ID')
+    channel_id = os.environ.get('MODMAIL_ID')
     util = Util(client, None)
     message = util.convert_mentions_to_string(message)
 
@@ -160,7 +160,7 @@ async def on_message(message):
 
 
 # make a command that can be used in dms to make a new thread
-@client.tree.command(name='new_conversation', description='Create a new thread on the modamail channel unaffected with past messages')
+@client.tree.command(name='new_conversation', description='Create a new thread on the modmail channel unaffected with past messages')
 @app_commands.describe()
 async def new_thread(interaction: discord.Interaction):
     """Create a new thread."""
@@ -169,7 +169,7 @@ async def new_thread(interaction: discord.Interaction):
         if interaction.guild is not None:
             await interaction.followup.send("This command can only be used in DMs, it creates a new thread in the modmail channel.")
             return
-        channel_id = os.environ.get('MODAMAIL_ID')
+        channel_id = os.environ.get('MODMAIL_ID')
         util = Util(client, None)
         user_id = await util.get_annon_id(str(hash(interaction.user)), str(interaction.user.id), new_conversion=True)
         user_id_str = str(user_id)
@@ -189,9 +189,9 @@ async def new_thread(interaction: discord.Interaction):
 # list the threads command
 
 
-@client.tree.command(name='list_threads', description='List all the threads in the modamail channel that you have made')
+@client.tree.command(name='list_threads', description='List all the threads in the modmail channel that you have made')
 async def list_threads(interaction: discord.Interaction):
-    """List all the threads in the modamail channel."""
+    """List all the threads in the modmail channel."""
     await interaction.response.defer(ephemeral=True)
     try:
         if interaction.guild is not None:
@@ -220,7 +220,7 @@ async def send_modmail(interaction: discord.Interaction):
             # make it only visible to the user
             await interaction.followup.send("This command can only be used in DMs, it sends a message to a specific modmail thread.")
             return
-        channel_id = os.environ.get('MODAMAIL_ID')
+        channel_id = os.environ.get('MODMAIL_ID')
         channel = client.get_channel(int(channel_id))
         if not isinstance(channel, discord.TextChannel):
             await interaction.followup.send("Modmail channel not found.")
@@ -293,11 +293,11 @@ async def help(interaction: discord.Interaction):
 - `/get_last_x_messages <channel> <count>`: Get the last x messages from a channel.
     - `<channel>`: Mention the channel you want to get messages from.
     - `<count>`: The number of messages to get.
-- `/new_conversation`: Create a new thread on the modamail channel unaffected with past messages.
+- `/new_conversation`: Create a new thread on the modmail channel unaffected with past messages.
     - This command can only be used in DMs.
     - It creates a new thread in the modmail channel.
     - messages sent to the dms will be sent to the new thread.
-- `/list_threads`: List all the threads in the modamail channel that you have made.
+- `/list_threads`: List all the threads in the modmail channel that you have made.
     - This command can only be used in DMs.
     - It lists all the threads you have created.
 - `/send_modmail`: Send a message to a specific modmail thread.
