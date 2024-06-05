@@ -133,7 +133,7 @@ async def on_message(message):
             await thread.send(f"Annonymous User: {message.content}")
             await util.send_attachment(message, thread)
             await message.add_reaction("📨")
-        elif int(message.channel.parent_id) == int(channel_id) and message.author.bot == False:
+        elif type(message.channel) == discord.threads.Thread and int(message.channel.parent_id) == int(channel_id) and message.author.bot == False:
             thread = message.channel
             user_id = int(thread.name.split(" ")[-1])
             discord_user_id = await util.get_user(user_id)
