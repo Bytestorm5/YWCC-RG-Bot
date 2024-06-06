@@ -1,6 +1,7 @@
 import discord
 import re
 import os
+import json
 
 
 class Util():
@@ -100,59 +101,83 @@ class Util():
                     current_chunk += line
             await send(current_chunk)
 
-    async def get_annon_id(self, user_hash, user_id, new_conversion=False):
-        """add a users hash to the file"""
-        # if the file does not exist, create it
-        try:
-            with open("db.txt", "r") as file:
-                pass
-        except FileNotFoundError:
-            with open("db.txt", "w") as file:
-                pass
+    async def verify_json_file_exists(self, file_name):
+        """Check if a json file exists, if not create it"""
+        if not os.path.exists(file_name):
+            with open(file_name, "w") as file:
+                file.write("{}")
+        if os.stat(file_name).st_size == 0:
+            with open(file_name, "w") as file:
+                file.write("{}")
 
-        with open("db.txt", "r") as file:
-            lines = file.readlines()
-            lines.reverse()
-            # check if the user is already in the file
-            for line in lines:
-                if not new_conversion and user_hash in line:
-                    # return the line number, if its in the file multiple times, return the last one
-                    return len(lines) - lines.index(line) - 1
-            # add the user to the file
-            lines.append(user_hash + " " + user_id + "\n")
-        with open("db.txt", "a") as file:
-            file.writelines(lines)
-        return len(lines) - 1
+    async def get_annon_id(self, user_hash, user_id, new_conversion=False):
+        """add a users hash to the db.json file, and return the index of current thread"""
+        await self.verify_json_file_exists("db.json")
+        with open("db.json", "r") as file:
+            data = json.load(file)
+            for key in data:
+                # if the user hash is already in the db, return the index of the active thread
+                if not new_conversion and user_hash == data[key]["hash"]:
+                    for key in data:
+                        if user_id == data[key]["id"] and data[key]["active"]:
+                            print(key)
+                            return key
+                    return None
+
+            data[str(len(data))] = {
+                "hash": user_hash,
+                "id": user_id,
+                "index": len(data),
+                "active": True
+            }
+            # set all other threads with the same user id to inactive
+            for key in data:
+                if user_id == data[key]["id"] and key != str(len(data) - 1):
+                    data[key]["active"] = False
+
+        with open("db.json", "w") as file:
+            json.dump(data, file)
+        return len(data) - 1
 
     async def get_user(self, row):
         """get a users id from the hash"""
-        try:
-            with open("db.txt", "r") as file:
-                pass
-        except FileNotFoundError:
-            with open("db.txt", "w") as file:
-                pass
-        with open("db.txt", "r") as file:
-            lines = file.readlines()
-            return lines[row].split(" ")[1] or None
+        await self.verify_json_file_exists("db.json")
+        with open("db.json", "r") as file:
+            data = json.load(file)
+            return data[str(row)]["id"]
 
     async def get_rows_with_id(self, user_id):
         """get all the rows with a user id"""
-        try:
-            with open("db.txt", "r") as file:
-                pass
-        except FileNotFoundError:
-            with open("db.txt", "w") as file:
-                pass
-        with open("db.txt", "r") as file:
-            lines = file.readlines()
+        await self.verify_json_file_exists("db.json")
+        with open("db.json", "r") as file:
+            data = json.load(file)
             rows = []
-            index = 0
-            for line in lines:
-                if user_id in line.split(" ")[1].strip():
-                    rows.append(str(index))
-                index += 1
+            for key in data:
+                if user_id == data[key]["id"]:
+                    rows.append(key)
             return rows
+
+    async def set_active(self, thread_index, hash):
+        """set a users thread to active, and all other threads with the same user id to inactive"""
+        await self.verify_json_file_exists("db.json")
+        with open("db.json", "r") as file:
+            arr = json.load(file)
+            for obj in arr:
+                if arr[obj]["hash"] == hash and arr[obj]["index"] == thread_index:
+                    arr[obj]["active"] = True
+                elif arr[obj]["hash"] == hash:
+                    arr[obj]["active"] = False
+        with open("db.json", "w") as file:
+            json.dump(arr, file)
+
+    async def get_thread_by_index(self, index):
+        """get a thread by its index"""
+        with open("db.json", "r") as file:
+            data = json.load(file)
+            for key in data:
+                if index == data[key]["index"]:
+                    return key
+            return None
 
     def convert_mentions_to_string(self, message: discord.Message):
         """Convert mentions in a message to string representations."""
