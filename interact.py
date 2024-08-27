@@ -77,7 +77,7 @@ async def get_chat_history(interaction: discord.Interaction, message_url: str):
         start_message = await channel.fetch_message(message_id)
         messages = []
         messages.append(util.process(start_message))
-        async for message in channel.history(after=start_message):
+        async for message in channel.history(after=start_message, limit=None):
             messages.append(util.process(message))
         messages = "\n".join(messages)
 

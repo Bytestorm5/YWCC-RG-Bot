@@ -20,7 +20,10 @@ class Util():
         """Get the name of a user by their ID. If the name is not cached, fetch it from the guild."""
         if id in self.user_dict:
             return self.user_dict[id]
-        name = self.guild.get_member(id).nick
+        name = self.guild.get_member(id)
+        if name == None:
+            return "Unknown/Deleted User"
+        name = name.nick
         name = name if name != None else self.client.get_user(
             id).display_name + "*"
         self.user_dict[id] = name
