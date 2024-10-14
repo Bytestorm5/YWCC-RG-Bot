@@ -131,7 +131,7 @@ async def on_message(message):
             threads = channel.threads
             # check if the user has a thread
             thread = [thread for thread in threads if thread.name ==
-                      f"Annonymous User {user_id_str}"]
+                      f"Anonymous User {user_id_str}"]
             if len(thread) == 1:
                 thread = thread[0]
             else:
@@ -139,7 +139,7 @@ async def on_message(message):
             if thread not in threads or thread.archived == True or thread.locked == True:
                 # if the thread is archived, locked or not in the list of threads, create a new thread
                 thread = await util.create_thread(channel, user_id_str)
-            await thread.send(f"Annonymous User: {message.content}")
+            await thread.send(f"Anonymous User: {message.content}")
             await util.send_attachment(message, thread)
             await message.add_reaction("📨")
         elif type(message.channel) == discord.threads.Thread and int(message.channel.parent_id) == int(channel_id) and message.author.bot == False:
@@ -176,7 +176,7 @@ async def new_thread(interaction: discord.Interaction):
         channel = client.get_channel(int(channel_id))
         threads = channel.threads
         thread = [thread for thread in threads if thread.name ==
-                  f"Annonymous User {user_id_str}"]
+                  f"Anonymous User {user_id_str}"]
         if len(thread) == 1:
             thread = thread[0]
         else:
@@ -202,7 +202,7 @@ async def list_threads(interaction: discord.Interaction):
         util = Util(client, None)
         thread_names = await util.get_rows_with_id(str(hash(interaction.user.id)))
         thread_names = [
-            f"Annonymous User {thread_name}" for thread_name in thread_names]
+            f"Anonymous User {thread_name}" for thread_name in thread_names]
         if len(thread_names) > 0:
             await interaction.followup.send(f"Threads: {', '.join(thread_names)}")
         else:
@@ -240,11 +240,11 @@ class ThreadSelect(discord.ui.Select):
         self.threads = threads
         self.util = util
         super().__init__(placeholder="Select a thread", options=[discord.SelectOption(
-            label=f"Annonymous User {thread}", value=f"{thread}") for thread in threads])
+            label=f"Anonymous User {thread}", value=f"{thread}") for thread in threads])
 
     async def callback(self, interaction: discord.Interaction):
         thread_num = interaction.data["values"][0]
-        thread_name = f"Annonymous User {thread_num}"
+        thread_name = f"Anonymous User {thread_num}"
         hash_val = str(hash(interaction.user.id))
         print(thread_num, hash_val)
         await self.util.set_active(int(thread_num), hash_val)

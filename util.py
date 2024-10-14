@@ -201,8 +201,8 @@ class Util():
 
     async def create_thread(self, channel, user_id_str):
         new_message = await channel.send(
-            f"Annonymous User {user_id_str}")
-        thread = await channel.create_thread(name=f"Annonymous User {user_id_str}", message=new_message)
+            f"Anonymous User {user_id_str}")
+        thread = await channel.create_thread(name=f"Anonymous User {user_id_str}", message=new_message)
         return thread
 
     async def send_attachment(self, message, destination):
